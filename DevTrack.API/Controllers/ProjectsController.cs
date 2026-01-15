@@ -1,15 +1,16 @@
+using DevTrack.API.Controllers.Base;
 using DevTrack.API.Data;
 using DevTrack.API.DTOs;
 using DevTrack.API.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace DevTrack.API.Controllers;
 
-[ApiController]
-[Route("api/projects")]
 [Authorize]
-public class ProjectsController : ControllerBase
+[Route("api/projects")]
+public class ProjectsController : BaseController
 {
     private readonly AppDbContext _context;
 
@@ -18,33 +19,46 @@ public class ProjectsController : ControllerBase
         _context = context;
     }
 
+    //  GET: api/projects
     [HttpGet]
-    public IActionResult GetAll()
+    public async Task<IActionResult> GetProjects()
     {
-        var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
-
-        var projects = _context.Projects
-            .Where(p => p.UserId == userId)
-            .ToList();
+        var projects = await _context.Projects
+            .Where(p => p.UserId == UserId)
+            .Include(p => p.Tasks)
+            .ToListAsync();
 
         return Ok(projects);
     }
 
+    //  POST: api/projects
     [HttpPost]
-    public IActionResult Create(CreateProjectDto dto)
+    public async Task<IActionResult> CreateProject(CreateProjectDto dto)
     {
-        var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
-
         var project = new Project
         {
             Id = Guid.NewGuid(),
             Name = dto.Name,
-            UserId = userId
+            UserId = UserId
         };
 
         _context.Projects.Add(project);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
-        return Created("", project);
+        return CreatedAtAction(nameof(GetProjects), new { id = project.Id }, project);
+    }
+
+    // GET: api/projects/{id}
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetProjectById(Guid id)
+    {
+        var project = await _context.Projects
+            .Include(p => p.Tasks)
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId);
+
+        if (project == null)
+            return NotFound("Project not found or not yours");
+
+        return Ok(project);
     }
 }
