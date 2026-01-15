@@ -14,12 +14,14 @@ namespace DevTrack.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly AppDbContext _context;
-    private const string JwtKey = "DEVTRACK_SUPER_SECRET_JWT_KEY_2026_32_CHARS";
+    private readonly string _jwtKey;
+    private readonly int _jwtExpirationHours;
 
-
-    public AuthController(AppDbContext context)
+    public AuthController(AppDbContext context, IConfiguration configuration)
     {
         _context = context;
+        _jwtKey = configuration["Jwt:Key"]!;
+        _jwtExpirationHours = int.Parse(configuration["Jwt:ExpirationHours"]!);
     }
 
     [HttpPost("register")]
@@ -58,12 +60,15 @@ public class AuthController : ControllerBase
             new Claim(ClaimTypes.Email, user.Email)
         };
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtKey));
+        var key = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(_jwtKey)
+        );
+
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(2),
+            expires: DateTime.UtcNow.AddHours(_jwtExpirationHours),
             signingCredentials: creds
         );
 
