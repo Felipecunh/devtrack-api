@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DevTrack.API.Data;
 using DevTrack.API.DTOs;
@@ -7,6 +8,7 @@ namespace DevTrack.API.Controllers;
 
 [ApiController]
 [Route("api/tasks")]
+[Authorize] 
 public class TasksController : ControllerBase
 {
     private readonly AppDbContext _context;
@@ -16,14 +18,9 @@ public class TasksController : ControllerBase
         _context = context;
     }
 
-    // POST /api/tasks
     [HttpPost]
     public IActionResult Create(CreateTaskDto dto)
     {
-        var projectExists = _context.Projects.Any(p => p.Id == dto.ProjectId);
-        if (!projectExists)
-            return NotFound("Project not found");
-
         var task = new TaskItem
         {
             Id = Guid.NewGuid(),
@@ -37,7 +34,6 @@ public class TasksController : ControllerBase
         return Created("", task);
     }
 
-    // GET /api/tasks/by-project/{projectId}
     [HttpGet("by-project/{projectId}")]
     public IActionResult GetByProject(Guid projectId)
     {

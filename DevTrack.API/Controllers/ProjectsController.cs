@@ -1,5 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using DevTrack.API.Data;
 using DevTrack.API.DTOs;
 using DevTrack.API.Models;
@@ -8,6 +8,7 @@ namespace DevTrack.API.Controllers;
 
 [ApiController]
 [Route("api/projects")]
+[Authorize] 
 public class ProjectsController : ControllerBase
 {
     private readonly AppDbContext _context;
@@ -17,32 +18,12 @@ public class ProjectsController : ControllerBase
         _context = context;
     }
 
-    // GET /api/projects
     [HttpGet]
     public IActionResult GetAll()
     {
-        var projects = _context.Projects
-            .Include(p => p.Tasks)
-            .ToList();
-
-        return Ok(projects);
+        return Ok(_context.Projects.ToList());
     }
 
-    // GET /api/projects/{id}
-    [HttpGet("{id}")]
-    public IActionResult GetById(Guid id)
-    {
-        var project = _context.Projects
-            .Include(p => p.Tasks)
-            .FirstOrDefault(p => p.Id == id);
-
-        if (project == null)
-            return NotFound();
-
-        return Ok(project);
-    }
-
-    // POST /api/projects
     [HttpPost]
     public IActionResult Create(CreateProjectDto dto)
     {
@@ -55,6 +36,6 @@ public class ProjectsController : ControllerBase
         _context.Projects.Add(project);
         _context.SaveChanges();
 
-        return CreatedAtAction(nameof(GetById), new { id = project.Id }, project);
+        return Created("", project);
     }
 }
