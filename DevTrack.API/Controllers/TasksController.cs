@@ -8,9 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DevTrack.API.Controllers;
 
-[ApiController]
-[Route("api/tasks")]
 [Authorize]
+[Route("api/tasks")]
 public class TasksController : BaseController
 {
     private readonly AppDbContext _context;
@@ -20,11 +19,12 @@ public class TasksController : BaseController
         _context = context;
     }
 
+    // POST: api/tasks
     [HttpPost]
-    public IActionResult Create(CreateTaskDto dto)
+    public async Task<IActionResult> Create(CreateTaskDto dto)
     {
-        var project = _context.Projects
-            .FirstOrDefault(p => p.Id == dto.ProjectId && p.UserId == UserId);
+        var project = await _context.Projects
+            .FirstOrDefaultAsync(p => p.Id == dto.ProjectId && p.UserId == UserId);
 
         if (project == null)
             return NotFound("Project not found or not yours");
@@ -37,18 +37,31 @@ public class TasksController : BaseController
         };
 
         _context.Tasks.Add(task);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
-        return Created("", task);
+        var response = new TaskResponseDto
+        {
+            Id = task.Id,
+            Title = task.Title,
+            ProjectId = task.ProjectId
+        };
+
+        return Created("", response);
     }
 
+    // GET: api/tasks/by-project/{projectId}
     [HttpGet("by-project/{projectId}")]
-    public IActionResult GetByProject(Guid projectId)
+    public async Task<IActionResult> GetByProject(Guid projectId)
     {
-        var tasks = _context.Tasks
-            .Include(t => t.Project)
+        var tasks = await _context.Tasks
             .Where(t => t.ProjectId == projectId && t.Project.UserId == UserId)
-            .ToList();
+            .Select(t => new TaskResponseDto
+            {
+                Id = t.Id,
+                Title = t.Title,
+                ProjectId = t.ProjectId
+            })
+            .ToListAsync();
 
         return Ok(tasks);
     }
