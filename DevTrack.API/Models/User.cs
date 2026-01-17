@@ -1,10 +1,12 @@
-namespace DevTrack.API.Models;
-
-public class User
+namespace DevTrack.API.Models
 {
-    public Guid Id { get; set; }
-    public string Email { get; set; } = null!;
-    public string PasswordHash { get; set; } = null!;
+    public class User
+    {
+        public Guid Id { get; set; }
+        public string Email { get; set; } = null!;
+        public string Name { get; set; } = null!;
+        public string PasswordHash { get; set; } = null!; 
 
-    public List<Project> Projects { get; set; } = new();
+        public List<Project> Projects { get; set; } = new(); // Relacionamento com Projects
+    }
 }
