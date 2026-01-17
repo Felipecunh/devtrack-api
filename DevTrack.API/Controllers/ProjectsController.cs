@@ -45,9 +45,37 @@ public class ProjectsController : BaseController
         ));
     }
 
+    // GET: api/projects/{id}
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetProjectById(Guid id)
+    {
+        var project = await _context.Projects
+            .Where(p => p.Id == id && p.UserId == UserId)
+            .Select(p => new ProjectResponseDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Tasks = p.Tasks.Select(t => new TaskResponseDto
+                {
+                    Id = t.Id,
+                    Title = t.Title,
+                    ProjectId = t.ProjectId
+                }).ToList()
+            })
+            .FirstOrDefaultAsync();
+
+        if (project == null)
+            return NotFound(ApiResponse<string>.Fail("Project not found or not yours"));
+
+        return Ok(ApiResponse<ProjectResponseDto>.Ok(
+            project,
+            "Project retrieved successfully"
+        ));
+    }
+
     // POST: api/projects
     [HttpPost]
-    public async Task<IActionResult> CreateProject([FromBody] CreateProjectDto dto)
+    public async Task<IActionResult> CreateProject(CreateProjectDto dto)
     {
         var project = new Project
         {
@@ -76,33 +104,42 @@ public class ProjectsController : BaseController
         );
     }
 
-    // GET: api/projects/{id}
-    [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetProjectById(Guid id)
+    // PUT: api/projects/{id}
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> UpdateProject(Guid id, UpdateProjectDto dto)
     {
         var project = await _context.Projects
-            .Where(p => p.Id == id && p.UserId == UserId)
-            .Select(p => new ProjectResponseDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Tasks = p.Tasks.Select(t => new TaskResponseDto
-                {
-                    Id = t.Id,
-                    Title = t.Title,
-                    ProjectId = t.ProjectId
-                }).ToList()
-            })
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId);
 
         if (project == null)
-            return NotFound(ApiResponse<string>.Fail(
-                "Project not found or not yours"
-            ));
+            return NotFound(ApiResponse<string>.Fail("Project not found or not yours"));
 
-        return Ok(ApiResponse<ProjectResponseDto>.Ok(
-            project,
-            "Project retrieved successfully"
+        project.Name = dto.Name;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(ApiResponse<string>.Ok(
+            "Project updated successfully",
+            "Success"
+        ));
+    }
+
+    // DELETE: api/projects/{id}
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteProject(Guid id)
+    {
+        var project = await _context.Projects
+            .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId);
+
+        if (project == null)
+            return NotFound(ApiResponse<string>.Fail("Project not found or not yours"));
+
+        _context.Projects.Remove(project);
+        await _context.SaveChangesAsync();
+
+        return Ok(ApiResponse<string>.Ok(
+            "Project deleted successfully",
+            "Success"
         ));
     }
 }
