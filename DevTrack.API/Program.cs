@@ -1,23 +1,50 @@
 using DevTrack.API.Data;
+using DevTrack.API.Filters;
+using DevTrack.API.Middlewares;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ================================
-//  Controllers
+// Controllers + Global Validation Filter + JSON
 // ================================
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    // Usa o seu ValidationFilter global
+    options.Filters.Add<ValidationFilter>();
+})
+.AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+});
 
 // ================================
-//  Swagger + JWT
+// DESATIVA validação automática do ASP.NET
+// ================================
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.SuppressModelStateInvalidFilter = true;
+});
+
+// ================================
+// Swagger + JWT
 // ================================
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "DevTrack.API",
+        Version = "v1"
+    });
+
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -45,37 +72,51 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // ================================
-//  EF Core + SQLite
+// EF Core + SQLite
 // ================================
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=devtrack.db"));
+    options.UseSqlite(
+        builder.Configuration.GetConnectionString("Default")
+        ?? "Data Source=devtrack.db"
+    )
+);
 
 // ================================
-//  JWT
+// JWT Authentication
 // ================================
 var jwtKey = builder.Configuration["Jwt:Key"];
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-.AddJwtBearer(options =>
+if (string.IsNullOrWhiteSpace(jwtKey))
 {
-    options.TokenValidationParameters = new TokenValidationParameters
+    throw new InvalidOperationException("JWT Key is not configured.");
+}
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        ValidateIssuer = false,
-        ValidateAudience = false,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(jwtKey!)
-        )
-    };
-});
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey)
+            )
+        };
+    });
 
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
 // ================================
-//  Pipeline
+// Global Exception Middleware
+// ================================
+app.UseMiddleware<ExceptionMiddleware>();
+
+// ================================
+// HTTP Pipeline
 // ================================
 if (app.Environment.IsDevelopment())
 {
