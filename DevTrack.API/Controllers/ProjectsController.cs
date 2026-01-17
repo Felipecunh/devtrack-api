@@ -20,22 +20,38 @@ public class ProjectsController : BaseController
         _context = context;
     }
 
-    // GET: api/projects?page=1&pageSize=10
+    // GET: api/projects?page=1&pageSize=10&search=abc&orderBy=name
     [HttpGet]
     public async Task<IActionResult> GetProjects(
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10)
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null,
+        [FromQuery] string? orderBy = null)
     {
         if (page <= 0) page = 1;
         if (pageSize <= 0) pageSize = 10;
 
-        var baseQuery = _context.Projects
+        var query = _context.Projects
             .Where(p => p.UserId == UserId);
 
-        var totalItems = await baseQuery.CountAsync();
+        // 🔎 Search
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(p =>
+                p.Name.ToLower().Contains(search.ToLower()));
+        }
 
-        var projects = await baseQuery
-            .OrderBy(p => p.Name)
+        // ↕️ Ordering
+        query = orderBy?.ToLower() switch
+        {
+            "name" => query.OrderBy(p => p.Name),
+            "created" => query.OrderBy(p => p.Id),
+            _ => query.OrderBy(p => p.Name)
+        };
+
+        var totalItems = await query.CountAsync();
+
+        var projects = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(p => new ProjectResponseDto
@@ -88,9 +104,11 @@ public class ProjectsController : BaseController
             .FirstOrDefaultAsync();
 
         if (project == null)
+        {
             return NotFound(
                 ApiResponse<string>.Fail("Project not found or not yours")
             );
+        }
 
         return Ok(
             ApiResponse<ProjectResponseDto>.Ok(
@@ -139,9 +157,11 @@ public class ProjectsController : BaseController
             .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId);
 
         if (project == null)
+        {
             return NotFound(
                 ApiResponse<string>.Fail("Project not found or not yours")
             );
+        }
 
         project.Name = dto.Name;
         await _context.SaveChangesAsync();
@@ -162,9 +182,11 @@ public class ProjectsController : BaseController
             .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId);
 
         if (project == null)
+        {
             return NotFound(
                 ApiResponse<string>.Fail("Project not found or not yours")
             );
+        }
 
         _context.Projects.Remove(project);
         await _context.SaveChangesAsync();
