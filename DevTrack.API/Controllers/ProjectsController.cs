@@ -20,12 +20,24 @@ public class ProjectsController : BaseController
         _context = context;
     }
 
-    // GET: api/projects
+    // GET: api/projects?page=1&pageSize=10
     [HttpGet]
-    public async Task<IActionResult> GetProjects()
+    public async Task<IActionResult> GetProjects(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        var projects = await _context.Projects
-            .Where(p => p.UserId == UserId)
+        if (page <= 0) page = 1;
+        if (pageSize <= 0) pageSize = 10;
+
+        var baseQuery = _context.Projects
+            .Where(p => p.UserId == UserId);
+
+        var totalItems = await baseQuery.CountAsync();
+
+        var projects = await baseQuery
+            .OrderBy(p => p.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(p => new ProjectResponseDto
             {
                 Id = p.Id,
@@ -39,10 +51,21 @@ public class ProjectsController : BaseController
             })
             .ToListAsync();
 
-        return Ok(ApiResponse<List<ProjectResponseDto>>.Ok(
-            projects,
-            "Projects retrieved successfully"
-        ));
+        var result = new PagedResultDto<ProjectResponseDto>
+        {
+            Items = projects,
+            Page = page,
+            PageSize = pageSize,
+            TotalItems = totalItems,
+            TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize)
+        };
+
+        return Ok(
+            ApiResponse<PagedResultDto<ProjectResponseDto>>.Ok(
+                result,
+                "Projects retrieved successfully"
+            )
+        );
     }
 
     // GET: api/projects/{id}
@@ -65,12 +88,16 @@ public class ProjectsController : BaseController
             .FirstOrDefaultAsync();
 
         if (project == null)
-            return NotFound(ApiResponse<string>.Fail("Project not found or not yours"));
+            return NotFound(
+                ApiResponse<string>.Fail("Project not found or not yours")
+            );
 
-        return Ok(ApiResponse<ProjectResponseDto>.Ok(
-            project,
-            "Project retrieved successfully"
-        ));
+        return Ok(
+            ApiResponse<ProjectResponseDto>.Ok(
+                project,
+                "Project retrieved successfully"
+            )
+        );
     }
 
     // POST: api/projects
@@ -112,16 +139,19 @@ public class ProjectsController : BaseController
             .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId);
 
         if (project == null)
-            return NotFound(ApiResponse<string>.Fail("Project not found or not yours"));
+            return NotFound(
+                ApiResponse<string>.Fail("Project not found or not yours")
+            );
 
         project.Name = dto.Name;
-
         await _context.SaveChangesAsync();
 
-        return Ok(ApiResponse<string>.Ok(
-            "Project updated successfully",
-            "Success"
-        ));
+        return Ok(
+            ApiResponse<string>.Ok(
+                "Project updated successfully",
+                "Success"
+            )
+        );
     }
 
     // DELETE: api/projects/{id}
@@ -132,14 +162,18 @@ public class ProjectsController : BaseController
             .FirstOrDefaultAsync(p => p.Id == id && p.UserId == UserId);
 
         if (project == null)
-            return NotFound(ApiResponse<string>.Fail("Project not found or not yours"));
+            return NotFound(
+                ApiResponse<string>.Fail("Project not found or not yours")
+            );
 
         _context.Projects.Remove(project);
         await _context.SaveChangesAsync();
 
-        return Ok(ApiResponse<string>.Ok(
-            "Project deleted successfully",
-            "Success"
-        ));
+        return Ok(
+            ApiResponse<string>.Ok(
+                "Project deleted successfully",
+                "Success"
+            )
+        );
     }
 }
