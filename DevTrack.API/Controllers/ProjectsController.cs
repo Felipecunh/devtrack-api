@@ -31,17 +31,18 @@ public class ProjectsController : BaseController
         if (page <= 0) page = 1;
         if (pageSize <= 0) pageSize = 10;
 
+        // Busca apenas projetos do usuário autenticado
         var query = _context.Projects
             .Where(p => p.UserId == UserId);
 
-        // 🔎 Search
+        // Filtro simples por nome do projeto
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(p =>
                 p.Name.ToLower().Contains(search.ToLower()));
         }
 
-        // ↕️ Ordering
+        // Ordenação básica (pode ser expandida no futuro)
         query = orderBy?.ToLower() switch
         {
             "name" => query.OrderBy(p => p.Name),
@@ -58,11 +59,15 @@ public class ProjectsController : BaseController
             {
                 Id = p.Id,
                 Name = p.Name,
+
+                // Retorna também as tasks do projeto
+                // incluindo o status para manter o frontend sincronizado
                 Tasks = p.Tasks.Select(t => new TaskResponseDto
                 {
                     Id = t.Id,
                     Title = t.Title,
-                    ProjectId = t.ProjectId
+                    ProjectId = t.ProjectId,
+                    Status = t.Status
                 }).ToList()
             })
             .ToListAsync();
@@ -94,11 +99,14 @@ public class ProjectsController : BaseController
             {
                 Id = p.Id,
                 Name = p.Name,
+
+                // Retorna as tasks já com o status atual
                 Tasks = p.Tasks.Select(t => new TaskResponseDto
                 {
                     Id = t.Id,
                     Title = t.Title,
-                    ProjectId = t.ProjectId
+                    ProjectId = t.ProjectId,
+                    Status = t.Status
                 }).ToList()
             })
             .FirstOrDefaultAsync();

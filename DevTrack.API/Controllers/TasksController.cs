@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
+// Alias para evitar conflito com System.Threading.Tasks.TaskStatus
+using TaskItemStatus = DevTrack.API.Models.TaskStatus;
+
 namespace DevTrack.API.Controllers;
 
 [Authorize]
@@ -20,10 +23,10 @@ public class TasksController : BaseController
         _context = context;
     }
 
-    // POST: api/tasks
     [HttpPost]
     public async Task<IActionResult> Create(CreateTaskDto dto)
     {
+        // Verifica se o projeto existe e se pertence ao usuário autenticado
         var project = await _context.Projects
             .FirstOrDefaultAsync(p => p.Id == dto.ProjectId && p.UserId == UserId);
 
@@ -34,7 +37,10 @@ public class TasksController : BaseController
         {
             Id = Guid.NewGuid(),
             Title = dto.Title,
-            ProjectId = project.Id
+            ProjectId = project.Id,
+            Status = TaskItemStatus.Pendente,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
         _context.Tasks.Add(task);
@@ -45,13 +51,13 @@ public class TasksController : BaseController
             {
                 Id = task.Id,
                 Title = task.Title,
-                ProjectId = task.ProjectId
+                ProjectId = task.ProjectId,
+                Status = task.Status
             },
             "Task created successfully"
         ));
     }
 
-    // GET: api/tasks/by-project/{projectId}?page=1&pageSize=10&search=test&orderBy=title
     [HttpGet("by-project/{projectId:guid}")]
     public async Task<IActionResult> GetByProject(
         Guid projectId,
@@ -64,6 +70,7 @@ public class TasksController : BaseController
         if (page <= 0) page = 1;
         if (pageSize <= 0) pageSize = 10;
 
+        // Base da consulta já restringindo pelo usuário dono do projeto
         var baseQuery = _context.Tasks
             .Include(t => t.Project)
             .Where(t =>
@@ -71,6 +78,7 @@ public class TasksController : BaseController
                 t.Project.UserId == UserId
             );
 
+        // Filtro simples por título
         if (!string.IsNullOrWhiteSpace(search))
         {
             baseQuery = baseQuery.Where(t =>
@@ -78,6 +86,7 @@ public class TasksController : BaseController
             );
         }
 
+        // Ordenação básica (facilmente extensível)
         baseQuery = orderBy?.ToLower() switch
         {
             "title" => baseQuery.OrderBy(t => t.Title),
@@ -93,7 +102,8 @@ public class TasksController : BaseController
             {
                 Id = t.Id,
                 Title = t.Title,
-                ProjectId = t.ProjectId
+                ProjectId = t.ProjectId,
+                Status = t.Status
             })
             .ToListAsync();
 
@@ -112,7 +122,6 @@ public class TasksController : BaseController
         ));
     }
 
-    // PUT: api/tasks/{id}
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, UpdateTaskDto dto)
     {
@@ -123,7 +132,10 @@ public class TasksController : BaseController
         if (task == null)
             return NotFound(ApiResponse<string>.Fail("Task not found or not yours"));
 
+        // Atualiza apenas o título
         task.Title = dto.Title;
+        task.UpdatedAt = DateTime.UtcNow;
+
         await _context.SaveChangesAsync();
 
         return Ok(ApiResponse<string>.Ok(
@@ -132,7 +144,28 @@ public class TasksController : BaseController
         ));
     }
 
-    // DELETE: api/tasks/{id}
+    [HttpPatch("{id:guid}/status")]
+    public async Task<IActionResult> UpdateStatus(Guid id, UpdateTaskStatusDto dto)
+    {
+        var task = await _context.Tasks
+            .Include(t => t.Project)
+            .FirstOrDefaultAsync(t => t.Id == id && t.Project.UserId == UserId);
+
+        if (task == null)
+            return NotFound(ApiResponse<string>.Fail("Task not found or not yours"));
+
+        // Atualização isolada do status para evitar efeitos colaterais
+        task.Status = dto.Status;
+        task.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(ApiResponse<string>.Ok(
+            "Task status updated successfully",
+            "Success"
+        ));
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

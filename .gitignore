@@ -1,6 +1,9 @@
 bin/
 obj/
-*.db
-*.db-shm
-*.db-wal
+node_modules/
 .env
+.vs/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
