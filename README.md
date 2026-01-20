@@ -1,4 +1,4 @@
-```md
+
 # DevTrack API
 
 DevTrack API é uma API REST para gerenciamento de projetos e tarefas, desenvolvida em .NET (C#) como projeto de portfólio.  
