@@ -2,7 +2,7 @@ bin/
 obj/
 node_modules/
 .env
-**/appsettings.Development.json
+./appsettings.Development.json
 .vs/
 .vscode/
 .idea/
